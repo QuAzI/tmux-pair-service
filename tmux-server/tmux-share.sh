@@ -1,10 +1,4 @@
 #!/bin/bash
-#
-# Run this script on guest side to create shared session
-# based on: https://tqdev.com/2017-helping-friends-on-the-linux-command-line
-# alternative: https://github.com/gravitational/teleconsole
-#
-# BUG: only one detach per session allowed by SOCAT
 
 checkDependency () {
     if [ ! -f $1 ]; then
@@ -21,8 +15,8 @@ checkDependency /usr/bin/socat
 # find first free port
 read lower_port upper_port < /proc/sys/net/ipv4/ip_local_port_range
 for (( port = lower_port ; port <= upper_port ; port++ )); do
-	export relay_port=$port
-	nc -zv localhost $port 2>/dev/null ; if [ $? -eq 1 ]; then break; fi
+    export relay_port=$port
+    nc -zv localhost $port 2>/dev/null ; if [ $? -eq 1 ]; then break; fi
 done
 
 
@@ -41,10 +35,32 @@ if [ $? != 0 ]; then
 fi
 
 
-socat exec:"tmux attach -t $tmux_session",pty,raw,echo=0,stderr,setsid,sigint,sane \
-    tcp-listen:$relay_port,bind=localhost,reuseaddr &
+TTY1=$(tty)
+set -- $(stty size) # $1 = rows $2 = columns
+CMD="stty rows $1; \
+stty cols $2; \
+TTY2=\$(tty); \
+while sleep 1; \
+do \
+  set -- \$(stty -F $TTY1 size); \
+  stty -F \$TTY2 rows \$1; \
+  stty -F \$TTY2 cols \$2; \
+  kill -28 \$\$; \
+done"
 
-export SOCAT_PID=$!
+
+session_active=1
+
+# only one detach per session allowed by SOCAT
+# so we beed loop
+sotmux () {
+  socat system:"$CMD & tmux attach -t $tmux_session",pty,openpty,raw,echo=0,stderr,sigint,sane,ctty \
+    tcp-listen:$relay_port,bind=localhost,reuseaddr,ignoreeof ; if [ $session_active -eq 1 ]; then sotmux; fi &
+
+	export SOCAT_PID=$!
+}
+
+sotmux &
 
 
 echo "Starting new session on $relay_server:$ssh_port to share port $relay_port"
@@ -55,10 +71,10 @@ export SSH_PID=$! SSH_CODE=$?
 
 if [ $SSH_CODE -eq 0 ]; then
     tmux attach -t $tmux_session
+	session_active=0
 else
     echo "SSH Connection failed for $tmux_session"
 fi
-
 
 if [ -z "$tmux_session" ]; then tmux kill-session -t $tmux_session 2>/dev/null ; fi
 kill $SSH_PID $SOCAT_PID

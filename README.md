@@ -20,3 +20,11 @@ Then run on support
 ```
 ssh tmux@localhost -p 2222
 ```
+
+
+# refs
+
+based on: https://tqdev.com/2017-helping-friends-on-the-linux-command-line
+which based on https://github.com/mevdschee/cli-support/blob/master/socat.sh
+alternative: https://github.com/gravitational/teleconsole
+
