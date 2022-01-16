@@ -1,0 +1,11 @@
+Welcome to tmux pairing service!
+
+Run on client side (ssh-client, tmux and socat have to be installed):
+  tmux-share.sh username@hostname portnumber
+  
+Then run on support side (in container):
+  tmux-connect.sh
+and then enter portnumber
+
+If you have "remote port forwarding FAILED" message please try other
+
